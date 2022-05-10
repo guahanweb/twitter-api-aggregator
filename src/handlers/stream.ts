@@ -18,7 +18,7 @@ export async function handler(payload) {
     const partition = getPartitionRoot();
     
     const { data, includes } = payload;
-    const { referenced_tweets } = data;
+    const { referenced_tweets } = data || {};
 
     const author = getAuthor(data.author_id, includes?.users);
     const { tags, mentions, urls } = parseEntities(data.entities);

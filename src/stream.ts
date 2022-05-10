@@ -41,8 +41,14 @@ function connect(retryAttempt = 0) {
             retryAttempt = 0;
         } catch (e) {
             if (data.detail === 'This stream is currently at the maximum allowed connection limit.') {
+                // if we get max connections, destroy the current connection
+                // then retry after 1 minute
                 logger.error(`twitter error: ${data.detail}`);
-                process.exit(1);
+                (stream as any).destroy();
+                setTimeout(() => {
+                    logger.info(`attempting to reestablish connection`);
+                    connect();
+                }, 60000);
             } else {
                 // keep alive signal received. do nothing.
             }
@@ -55,6 +61,7 @@ function connect(retryAttempt = 0) {
             // reconnect with exponential backoff
             setTimeout(() => {
                 logger.warn('twitter connection error; reconnecting...', { retryAttempt });
+                (stream as any).destroy();
                 connect(retryAttempt++);
             }, 2 ** retryAttempt);
         }
