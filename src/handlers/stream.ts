@@ -20,7 +20,7 @@ export async function handler(payload) {
     const { data, includes } = payload;
     const { referenced_tweets } = data || {};
 
-    const author = getAuthor(data.author_id, includes?.users);
+    const author = getAuthor(data?.author_id, includes?.users);
     const { tags, mentions, urls } = parseEntities(data.entities);
 
     let index = 0; // default to 'tweeted'
@@ -37,25 +37,32 @@ export async function handler(payload) {
     logger.info('twitter event', { partition, type });
 
     // counts all the original posts
+    const author_id = data?.author_id || 'unknown';
+
     let chain = client.multi()
-        .ZADD(`${event}:authors`, { score: 1, value: data.author_id }, { INCR: true });
+        .ZADD(`${event}:authors`, { score: 1, value: author_id}, { INCR: true });
 
     if (author !== null) {
-        chain = chain.HSET(`user:${data.author_id}`, new Map([
-            ['username', author.username],
-            ['followers', author.public_metrics.followers_count.toString()],
-            ['listed', author.public_metrics.listed_count.toString()],
-            ['tweets', author.public_metrics.tweet_count.toString()],
+        const username = author?.username;
+        const followers_count = author?.public_metrics?.followers_count;
+        const listed_count = author?.public_metrics?.listed_count;
+        const tweet_count = author?.public_metrics?.tweet_count;
+
+        chain = chain.HSET(`user:${author_id}`, new Map([
+            ['username', username || 'unknown'],
+            ['followers', (followers_count || 0).toString()],
+            ['listed', (listed_count || 0).toString()],
+            ['tweets', (tweet_count || 0).toString()],
         ]));
     }
 
-    tags.forEach((tag) => chain = chain.ZADD(`${event}:tags`, { score: 1, value: tag }, { INCR: true }));
-    mentions.forEach((username) => chain = chain.ZADD(`${event}:mentions`, { score: 1, value: username }, { INCR: true }));
-    urls.forEach((url) => chain = chain.ZADD(`${event}:urls`, { score: 1, value: url }, { INCR: true }));
+    tags.forEach((tag) => chain = chain.ZADD(`${event}:tags`, { score: 1, value: tag || 'unknown' }, { INCR: true }));
+    mentions.forEach((username) => chain = chain.ZADD(`${event}:mentions`, { score: 1, value: username || 'unknown' }, { INCR: true }));
+    urls.forEach((url) => chain = chain.ZADD(`${event}:urls`, { score: 1, value: url || 'unknown' }, { INCR: true }));
 
     // store all the counts by reference
     if (reference !== null) {
-        chain = chain.ZADD(`${event}:refs`, { score: 1, value: reference }, { INCR: true });
+        chain = chain.ZADD(`${event}:refs`, { score: 1, value: reference || 'unknown' }, { INCR: true });
     }
 
     await chain.exec();

@@ -1,9 +1,8 @@
-import { RedisClientType } from '@node-redis/client';
 import { RedisClientOptions } from "redis";
 import redis = require('redis');
 import { logger } from '../logger';
 
-let client: RedisClientType;
+let client;
 export async function init({ redisHost, redisPort }: any) {
     logger.info('connecting to redis...', { redisHost, redisPort });
     client = redis.createClient({
