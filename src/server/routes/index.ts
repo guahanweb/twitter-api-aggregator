@@ -4,31 +4,27 @@ import { logger } from '../../logger';
 import * as transformers from '../transformers';
 
 type MiddlewareFunction = (req: Request, res: Response, next: NextFunction) => RequestHandler
+type SummaryMode = 'monthly'|'daily'
 
-function normalizePrefix(date: string, daily = false) {
-    const format = /^\d{4}-\d{2}-\d{2}$/;
-    if (!date.match(format)) throw new Error('invalid date: must be in yyyy-mm-dd format');
-    const [ y, m, d ] = date.split('-');
-    return {
-        date: new Date(date),
-        prefix: daily ? `${y}${m}${d}` : `${y}${m}`
-    };
+function getSummary(mode: SummaryMode, prefix: string, date: Date) {
+    return mode === 'monthly'
+        ? getMonthlySummary(prefix, date)
+        : getDailySummary(prefix);
 }
 
-function summary(): MiddlewareFunction {
+function parseParams(mode: SummaryMode, params: { year: string, month: string, day?: string }) {
+    const { year, month, day } = params;
+    const prefix = mode === 'monthly' ? `${year}${month}` : `${year}${month}${day}`;
+    const dt = `${year}-${month}-` + (mode === 'monthly' ? '01' : day);
+    const date = new Date(dt);
+    return { prefix, date };
+}
+
+function summary(mode: SummaryMode): MiddlewareFunction {
     return async function (req, res, next) {
         try {
-            const { mode, date } = req.params;
-            const normalized = normalizePrefix(date, mode === 'daily');
-
-            let results;
-            if (mode === 'daily') {
-                results = await getDailySummary(normalized.prefix);
-            } else {
-                results = await getMonthlySummary(normalized.prefix, normalized.date);
-            }
-
-            const { authors, tags } = results;
+            const { prefix, date } = parseParams(mode, req.params);
+            const { authors, tags } = await getSummary(mode, prefix, date);
             const summary = {
                 tags: transformers.redisScores(tags, 'tag'),
                 authors,
@@ -42,8 +38,28 @@ function summary(): MiddlewareFunction {
     }
 }
 
+function report(mode: SummaryMode): MiddlewareFunction {
+    return async function (req, res, next) {
+        try {
+            const { prefix, date } = parseParams(mode, req.params);
+            const { authors, tags } = await getSummary(mode, prefix, date);
+            const summary = {
+                tags: transformers.redisScores(tags, 'tag'),
+                authors,
+            };
+
+            return res.render('summary', { info: { mode, date, ...summary } });
+        } catch (err) {
+            return res.render('error', { err });
+        }
+    }
+}
+
 // manage configuration of all supported routes here
 export default function initialize(app) {
-    app.get('/summary/:date/:mode', summary());
+    app.get('/summary/:year([0-9]{4})/:month([0-9]{2})/:day([0-9]{2})', summary('daily'));
+    app.get('/summary/:year([0-9]{4})/:month([0-9]{2})', summary('monthly'));
+    app.get('/report/:year([0-9]{4})/:month([0-9]{2})/:day([0-9]{2})', report('daily'));
+    app.get('/report/:year([0-9]{4})/:month([0-9]{2})', report('monthly'));
 }
 

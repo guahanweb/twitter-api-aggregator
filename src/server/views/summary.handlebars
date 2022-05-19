@@ -1,0 +1,43 @@
+<div class="container">
+    <h1>{{ucwords info.mode}} Summary for {{formatDate info.date info.mode}}</h1>
+    <div class="row">
+        <div class="col-9">
+            <h3>Top Twitter Accounts</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Score</th>
+                        <th scope="col">Handle</th>
+                        <th scope="col">Tweets</th>
+                        <th scope="col">Followers</th>
+                        <th scope="col">Listed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {{#each info.authors}}
+                    <tr>
+                        <th scope="row">{{inc @index}}</th>
+                        <td class="text-muted">{{this.score}}</td>
+                        <td class="fw-bold"><a href="https://twitter.com/{{this.username}}" target="_blank">@{{this.username}}</a></td>
+                        <td>{{this.tweets}}</td>
+                        <td>{{this.followers}}</td>
+                        <td>{{this.listed}}</td>
+                    </tr>
+                {{/each}}
+                </tbody>
+            </table>
+        </div>
+        <div class="col">
+            <h3>Top Hashtags</h3>
+            <ol class="list-group list-group-numbered">
+            {{#each info.tags}}
+                <li class="list-group-item">
+                    <span class="fw-bold"><a href="https://twitter.com/hashtag/{{this.tag}}" target="_blank">#{{this.tag}}</a></span>
+                    <span class="text-muted">({{this.score}})</span>
+                </li>
+            {{/each}}
+            </ol>
+        </div>
+    </div>
+</div>
