@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction, RequestHandler } from 'express';
-import { getDailySummary, getMonthlySummary } from '../../handlers/report';
+import { getDailySummary, getMonthlySummary, getDailyRangeSummary } from '../../handlers/report';
+import { zeropad } from '../../handlers/utils';
 import { logger } from '../../logger';
 import * as transformers from '../transformers';
 
@@ -12,11 +13,15 @@ function getSummary(mode: SummaryMode, prefix: string, date: Date) {
         : getDailySummary(prefix);
 }
 
-function parseParams(mode: SummaryMode, params: { year: string, month: string, day?: string }) {
-    const { year, month, day } = params;
+function normalizeDate(y, m, d, mode) {
+    const dt = `${y}-${m}-` + (mode === 'monthly' ? '01' : d);
+    return new Date(dt);
+}
+
+function parseParams(mode: SummaryMode, params: { year: string, month: string, day?: string, from?: string, to?: string }) {
+    const { year, month, day, from, to } = params;
     const prefix = mode === 'monthly' ? `${year}${month}` : `${year}${month}${day}`;
-    const dt = `${year}-${month}-` + (mode === 'monthly' ? '01' : day);
-    const date = new Date(dt);
+    const date = normalizeDate(year, month, day, mode);
     return { prefix, date };
 }
 
@@ -34,6 +39,27 @@ function summary(mode: SummaryMode): MiddlewareFunction {
         } catch (err: any) {
             logger.error(err.message, err);
             return res.status(500).send({ err: err.message });
+        }
+    }
+}
+
+function weeklyReport(): MiddlewareFunction {
+    return async function (req, res, next) {
+        try {
+            const { year, month, from, to } = req.params;
+            const prefix = `${year}${month}`;
+            const start = normalizeDate(year, month, from, 'daily');
+            const end = normalizeDate(year, month, to, 'daily');
+
+            const { authors, tags } = await getDailyRangeSummary(prefix, start, end);
+            const summary = {
+                tags: transformers.redisScores(tags, 'tag'),
+                authors,
+            };
+
+            return res.render('summary', { info: { mode: 'weekly', start, end, ...summary } });
+        } catch (err: any) {
+            return res.render('error', { err });
         }
     }
 }
@@ -60,6 +86,7 @@ export default function initialize(app) {
     app.get('/summary/:year([0-9]{4})/:month([0-9]{2})/:day([0-9]{2})', summary('daily'));
     app.get('/summary/:year([0-9]{4})/:month([0-9]{2})', summary('monthly'));
     app.get('/report/:year([0-9]{4})/:month([0-9]{2})/:day([0-9]{2})', report('daily'));
+    app.get('/report/:year([0-9]{4})/:month([0-9]{2})/:from([0-9]{2})-:to([0-9]{2})', weeklyReport());
     app.get('/report/:year([0-9]{4})/:month([0-9]{2})', report('monthly'));
 }
 

@@ -12,4 +12,6 @@ export const formatDate = (date: Date, mode: string) => {
 
 export const inc = (i: string) => parseInt(i) + 1;
 
+export const isweekly = (mode: string) => mode.toLowerCase() === 'weekly';
+
 export const ucwords = (str: string) => str.replace(/\w\S*/g, (word: string) => word.charAt(0).toUpperCase() + word.slice(1))

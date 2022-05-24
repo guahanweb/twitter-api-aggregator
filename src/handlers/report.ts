@@ -44,6 +44,34 @@ export async function getMonthlySummary(prefix: string, date: Date) {
     return JSON.parse(result);
 }
 
+export async function getDailyRangeSummary(prefix: string, start: Date, end: Date) {
+    const monthlyScript = fs.readFileSync(path.resolve(__dirname, 'scripts/summary.monthly.lua')).toString();
+    const client = getClient();
+
+    const currentYear = start.getFullYear();
+    const currentMonth = start.getMonth() + 1;
+    const daysInCurrentMonth = getDaysInMonth(currentYear, currentMonth);
+
+    // we only build keys between the start date and end date (or end of month)
+    const keys: string[] = [];
+    for (let i = start.getDate(); i <= Math.min(end.getDate(), daysInCurrentMonth); i++) {
+        const dailyPrefix = getPrefix(currentYear, currentMonth, i);
+        let cache_exists = await client.EXISTS(`${dailyPrefix}:authors`);
+        if (!cache_exists) await getDailySummary(dailyPrefix);
+        keys.push(dailyPrefix);
+    }
+
+    // now, let's aggregate the month
+    const result = await client.EVAL(monthlyScript, {
+        arguments: [
+            prefix,
+            JSON.stringify(keys),
+        ]
+    });
+
+    return JSON.parse(result);
+}
+
 export async function getDailySummary(prefix: string) {
     const script = fs.readFileSync(path.resolve(__dirname, 'scripts/summary.lua')).toString();
     const client = getClient();

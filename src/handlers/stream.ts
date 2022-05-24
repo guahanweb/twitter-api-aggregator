@@ -21,7 +21,14 @@ export async function handler(payload) {
     const { referenced_tweets } = data || {};
 
     const author = getAuthor(data?.author_id, includes?.users);
-    const { tags, mentions, urls } = parseEntities(data.entities);
+    const entities = data?.entities;
+    if (!entities) {
+        // short circuit the process, and log a warning
+        logger.warn('no entities to process', { data });
+        return;
+    }
+
+    const { tags, mentions, urls } = parseEntities(entities);
 
     let index = 0; // default to 'tweeted'
     let reference = null;

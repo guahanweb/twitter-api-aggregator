@@ -1,5 +1,9 @@
 <div class="container">
+    {{#if (isweekly info.mode)}}
+    <h1>{{ucwords info.mode}} Summary for {{formatDate info.start 'daily'}} through {{formatDate info.end 'daily'}}</h1>
+    {{else}}
     <h1>{{ucwords info.mode}} Summary for {{formatDate info.date info.mode}}</h1>
+    {{/if}}
     <div class="row">
         <div class="col-9">
             <h3>Top Twitter Accounts</h3>
